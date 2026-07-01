@@ -6,12 +6,15 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { SCENARIO_IDS, type ScenarioId } from "@/lib/dumb";
 
-type Msg = { parts: { type: string; text?: string }[] };
+type Part = { type: string; text?: string; url?: string };
+type Msg = { parts: Part[] };
 const partsText = (m: Msg, type: string) =>
   m.parts
     .filter((p) => p.type === type)
     .map((p) => p.text ?? "")
     .join("");
+const fileUrls = (m: Msg): string[] =>
+  m.parts.filter((p) => p.type === "file" && !!p.url).map((p) => p.url as string);
 
 export default function Page() {
   const [input, setInput] = useState("");
@@ -114,6 +117,16 @@ export default function Page() {
                     {text}
                   </div>
                 )}
+                {fileUrls(m).map((url, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={i}
+                    src={url}
+                    alt="Brandyn's cat"
+                    loading="lazy"
+                    className="max-w-[85%] rounded-2xl border border-black/10 dark:border-white/10"
+                  />
+                ))}
               </div>
             );
           })}

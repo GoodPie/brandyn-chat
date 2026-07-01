@@ -20,11 +20,15 @@ test("extractUserText returns empty string when no user message", () => {
   assert.equal(extractUserText([]), "");
 });
 
-test("every scenario returns a non-empty reply", () => {
+test("every scenario returns a non-empty reply (first + later turns)", () => {
   for (const s of SCENARIO_IDS) {
-    const r = replyFor(s, [user("hi")]);
-    if (r.kind === "text") assert.ok(r.text.length > 0, `${s} empty text`);
-    else assert.ok(r.thinking.length > 0 && r.final.length > 0, `${s} empty meltdown`);
+    for (const convo of [[user("hi")], [user("hi"), assistant("ok"), user("more")]]) {
+      const r = replyFor(s, convo);
+      if (r.kind === "text") assert.ok(r.text.length > 0, `${s} empty text`);
+      else if (r.kind === "photo")
+        assert.ok(r.caption.length > 0 && r.url.length > 0, `${s} bad photo`);
+      else assert.ok(r.thinking.length > 0 && r.final.length > 0, `${s} bad meltdown`);
+    }
   }
 });
 
@@ -44,22 +48,35 @@ test("fixed-line bits are constant", () => {
   assert.ok(hp.kind === "text" && hp.text.includes("headphones"));
 });
 
-test("willie: first reply is the intro, later replies are facts", () => {
-  const first = replyFor("willie", [user("hi")]);
-  assert.ok(first.kind === "text" && first.text.startsWith("Yeah cool, anyway"));
-  const later = replyFor("willie", [user("hi"), assistant("Yeah cool"), user("go on")]);
-  assert.ok(later.kind === "text" && !later.text.startsWith("Yeah cool, anyway"));
+test("each bird bit: intro first, facts after", () => {
+  const birds = ["willie", "newholland", "wattlebird", "wedgetail", "raven"];
+  for (const b of birds) {
+    const first = replyFor(b, [user("hi")]);
+    assert.ok(first.kind === "text" && first.text.startsWith("Yeah cool, anyway"), `${b} intro`);
+    const later = replyFor(b, [user("hi"), assistant("intro"), user("go on")]);
+    assert.ok(
+      later.kind === "text" && !later.text.startsWith("Yeah cool, anyway"),
+      `${b} should give a fact, not the intro`,
+    );
+  }
+});
+
+test("cats: intro first, then a photo with a /cats/ url", () => {
+  const first = replyFor("cats", [user("hi")]);
+  assert.ok(first.kind === "text" && first.text.includes("cats"));
+  const later = replyFor("cats", [user("hi"), assistant("say less"), user("show me")]);
+  assert.equal(later.kind, "photo");
+  assert.ok(
+    later.kind === "photo" && later.url.startsWith("/cats/") && later.caption.length > 0,
+  );
 });
 
 test("meltdown: warm-up text for first two replies, spirals on the third", () => {
-  // 0 prior assistant messages -> warm-up
   assert.equal(replyFor("meltdown", [user("hi")]).kind, "text");
-  // 1 prior -> still warm-up
   assert.equal(
     replyFor("meltdown", [user("hi"), assistant("What?"), user("hello")]).kind,
     "text",
   );
-  // 2 prior -> meltdown
   const m = replyFor("meltdown", [
     user("hi"),
     assistant("What?"),

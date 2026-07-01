@@ -10,7 +10,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function POST(req: Request) {
   const { messages, scenario } = await req.json();
-  const userText = extractUserText(messages ?? []);
+  const list = messages ?? [];
+  const userText = extractUserText(list);
+  const isFirstReply = list.filter((m: { role?: string }) => m.role === "assistant").length === 0;
 
   // Forward the visitor's message to Discord AFTER the response is sent, so it
   // never adds latency to the reply and survives the serverless function ending.
@@ -24,11 +26,14 @@ export async function POST(req: Request) {
     }).catch(() => {}); // a webhook failure must never break the chat
   });
 
-  const reply = replyFor(scenario, messages ?? []);
+  const reply = replyFor(scenario, list);
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
+      // Small "picking up my phone" pause before the very first reply; the
+      // typing indicator shows while we wait.
+      if (isFirstReply) await sleep(1200);
+
       if (reply.kind === "meltdown") {
-        // Stream the "thinking" spiral as reasoning parts, one line at a time.
         writer.write({ type: "reasoning-start", id: "r" });
         for (const line of reply.thinking) {
           writer.write({ type: "reasoning-delta", id: "r", delta: line + "\n" });
@@ -39,6 +44,13 @@ export async function POST(req: Request) {
         await streamWords(writer, reply.final);
         return;
       }
+
+      if (reply.kind === "photo") {
+        await streamWords(writer, reply.caption);
+        writer.write({ type: "file", url: reply.url, mediaType: "image/jpeg" });
+        return;
+      }
+
       await streamWords(writer, reply.text);
     },
   });

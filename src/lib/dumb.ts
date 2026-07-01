@@ -197,7 +197,8 @@ export function replyFor(scenario: ScenarioId | string, messages: Message[]): Re
 
   if (scenario === "cats") {
     if (priorAssistant === 0) return { kind: "text", text: CATS_INTRO };
-    const shot = pick(CAT_SHOTS);
+    const shot = CAT_SHOTS[priorAssistant - 1]; // one per reply, in order
+    if (!shot) return { kind: "text", text: "And that's it" };
     return { kind: "photo", caption: shot.caption, url: shot.url };
   }
 

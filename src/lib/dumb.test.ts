@@ -61,14 +61,20 @@ test("each bird bit: intro first, facts after", () => {
   }
 });
 
-test("cats: intro first, then a photo with a /cats/ url", () => {
-  const first = replyFor("cats", [user("hi")]);
+test("cats: intro, then photos in sequence, then 'And that's it'", () => {
+  // convo with k prior assistant replies
+  const convo = (k: number) => [
+    user("hi"),
+    ...Array.from({ length: k }, () => [assistant("a"), user("u")]).flat(),
+  ];
+  const first = replyFor("cats", convo(0));
   assert.ok(first.kind === "text" && first.text.includes("cats"));
-  const later = replyFor("cats", [user("hi"), assistant("say less"), user("show me")]);
-  assert.equal(later.kind, "photo");
-  assert.ok(
-    later.kind === "photo" && later.url.startsWith("/cats/") && later.caption.length > 0,
-  );
+  const s1 = replyFor("cats", convo(1));
+  const s2 = replyFor("cats", convo(2));
+  assert.ok(s1.kind === "photo" && s1.url === "/cats/arthur-1.jpg", "1st photo in order");
+  assert.ok(s2.kind === "photo" && s2.url === "/cats/arthur-2.jpg", "2nd photo in order");
+  const done = replyFor("cats", convo(7)); // after all 6 shots shown
+  assert.ok(done.kind === "text" && done.text === "And that's it");
 });
 
 test("meltdown: warm-up text for first two replies, spirals on the third", () => {
